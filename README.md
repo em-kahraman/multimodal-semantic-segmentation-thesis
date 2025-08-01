@@ -1,92 +1,4 @@
-# <p align=center>`DFormer for RGBD Semantic Segmentation`</p>
-
-非常荣幸我们收到3D视觉工坊的邀请，我们在6月19日晚上19:00开展了关于DFormerv2的论文直播，有兴趣的同学可以观看[直播回放](https://www.bilibili.com/video/BV1hGNozuEe4?t=4.2)，有问题欢迎在这个项目下提issue交流讨论，直播用到的PPT可以在这里下载[BaiduNetDisk](https://pan.baidu.com/s/1HjmiVBYZSnBGcPDJgfCeoA?pwd=ti6p)。
-
-
-
-This repository contains the official implementation of the following papers:
-
-> DFormer: Rethinking RGBD Representation Learning for Semantic Segmentation<br/>
-> [Bowen Yin](https://scholar.google.com/citations?user=xr_FRrEAAAAJ&hl=zh-CN&oi=sra),
-> [Xuying Zhang](https://scholar.google.com/citations?hl=zh-CN&user=huWpVyEAAAAJ),
-> [Zhongyu Li](https://scholar.google.com/citations?user=g6WHXrgAAAAJ&hl=zh-CN),
-> [Li Liu](https://scholar.google.com/citations?hl=zh-CN&user=9cMQrVsAAAAJ),
-> [Ming-Ming Cheng](https://scholar.google.com/citations?hl=zh-CN&user=huWpVyEAAAAJ),
-> [Qibin Hou*](https://scholar.google.com/citations?user=fF8OFV8AAAAJ&hl=zh-CN) <br/>
-> ICLR 2024. 
->[Paper Link](https://arxiv.org/abs/2309.09668) |
->[Homepage](https://yinbow.github.io/Projects/DFormer/index.html) |
->[公众号解读(集智书童)](https://mp.weixin.qq.com/s/lLFejycBr8o7JNoirRDmjQ) |
->[DFormer-SOD](https://github.com/VCIP-RGBD/DFormer-SOD) |
->[Jittor-Version(国产框架)](https://github.com/VCIP-RGBD/DFormer-Jittor) |
-
-
-> DFormerv2: Geometry Self-Attention for RGBD Semantic Segmentation<br/>
-> [Bo-Wen Yin](https://scholar.google.com/citations?user=xr_FRrEAAAAJ&hl=zh-CN&oi=sra),
-> [Jiao-Long Cao](https://github.com/caojiaolong),
-> [Ming-Ming Cheng](https://scholar.google.com/citations?hl=zh-CN&user=huWpVyEAAAAJ),
-> [Qibin Hou*](https://scholar.google.com/citations?user=fF8OFV8AAAAJ&hl=zh-CN)<br/>
-> CVPR 2025. 
-> [Paper Link](https://arxiv.org/abs/2504.04701) |
-> [中文版](https://mftp.mmcheng.net/Papers/25CVPR_RGBDSeg-CN.pdf) |
-> [直播回放](https://www.bilibili.com/video/BV1hGNozuEe4?t=4.2) |
-> [PPT](https://pan.baidu.com/s/1HjmiVBYZSnBGcPDJgfCeoA?pwd=ti6p) |
-> [Geometry prior demo](https://huggingface.co/spaces/bbynku/DFormerv2) |
-> [Jittor-Version(国产框架)](https://github.com/VCIP-RGBD/DFormer-Jittor) |
-
-
-
-
-:robot:[RGBD-Pretrain(You can train your own encoders)](https://github.com/VCIP-RGBD/RGBD-Pretrain)
-
-:anchor:[Application to new datasets(添加新数据集)](https://github.com/VCIP-RGBD/DFormer/tree/main/figs/application_new_dataset)
-
-
-We provide the geometry prior generation manner in DFormerv2, and you can further develope it and enhance the depth-related reasearch.
-We provide the RGBD pretraining code in [RGBD-Pretrain](https://github.com/VCIP-RGBD/RGBD-Pretrain).
-You can pretrain more powerful RGBD encoders and contribute to the RGBD research.
-
-We invite all to contribute in making it more acessible and useful. If you have any questions about our work, feel free to contact us via e-mail (bowenyin@mail.nankai.edu.cn, caojiaolong@mail.nankai.edu.cn). If you are using our code and evaluation toolbox for your research, please cite this paper ([BibTeX](https://scholar.googleusercontent.com/scholar.bib?q=info:GdonbkKZMYsJ:scholar.google.com/&output=citation&scisdr=ClEqKQU5EL_6hIbkmOc:AFWwaeYAAAAAZQvigOeM_E2bhS0d1niD6tYkedk&scisig=AFWwaeYAAAAAZQvigF3P1qyHXOMhOEt-zalsD8w&scisf=4&ct=citation&cd=-1&hl=zh-CN)).
-
-
-
-<p align="center">
-    <img src="figs/DFormer.png" width="600"  width="1200"/> <br />
-    <em> 
-    Figure 1: Comparisons between the existing methods and our DFormer (RGB-D Pre-training).
-    </em>
-</p>
-
-<p align="center">
-    <img src="figs/manner.jpg" width="300"  width="1200"/> <br />
-    <em> 
-    Figure 2: Comparisons among the main RGBD segmentation pipelines and our approach. (a) Use dual encoders to encode RGB and depth respectively and design fusion modules to fusion them, like CMX and GeminiFUsion; (b) Adopt an unified RGBD encoder to extract and
-    fuse RGBD features, like DFormer; (c) DFormerv2 use depth to form
-    a geometry prior of the scene and then enhance the visual features.
-    </em>
-</p>
-
-<p align="center">
-    <img src="figs/geo_attention.png" width="600"  width="1200"/> <br />
-    <em> 
-    Figure 2: The geometry attention map in our DFormerv2 and the effect of other attention mechanisms. Our geometry attention is endowed with the 3D geometry perception ability and can focus on the related regions of the whole scene. 
-    A simple visualization demo is provided at 
-    https://huggingface.co/spaces/bbynku/DFormerv2.
-    </em>
-    
-</p>
-
-
-## 1. 🌟  NEWS 
-
-- [2025/04/08] The code of DFormerv2 is available.
-- [2025/03/09] Our DFormerv2 has been accpeted by CVPR 2025.
-- [2025/02/19] The jittor implementation of DFormer is avaiable at [Jittor-Version](https://github.com/VCIP-RGBD/DFormer-Jittor).
-- [2024/10/12] Based on our DFormer, Wu's method UBCRCL has won the RUNNER-up at [Endoscopic Vision Challenge SegSTRONG-C Subchallenge](https://segstrongc.cs.jhu.edu/) of MICCAI 24. Congratulation!
-- [2024/04/21] We have upgraded and optimized the framework, greatly reducing training time, i.e., training duration for DFormer-L is reduced to ~12h from over 1day.
-- [2024/01/16] Our DFormer has been accpeted by The International Conference on Learning Representations (ICLR 2024).
-
-## 2. 🚀 Get Start
+## 🚀 Get Started
 
 **0. Install**
 
@@ -151,7 +63,7 @@ NYUDepth v2 trained DFormers T/S/B/L can be downloaded at
 
 
 <details>
-<summary>Orgnize the checkpoints and dataset folder in the following structure:</summary>
+<summary>Organize the checkpoints and dataset folder in the following structure:</summary>
 <pre><code>
 
 ```shell
@@ -233,63 +145,18 @@ PYTHONPATH="$(dirname $0)/..":$PYTHONPATH python utils/latency.py --config local
 ps: The latency highly depends on the devices. It is recommended to compare the latency on the same devices. 
 
 
-## 🚩 Performance
+## Acknowledgements
 
-<p align="center">
-    <img src="figs/Semseg.jpg" width="600"  width="1200"/> <br />
-    <em> 
-    Table 1: Comparisons between the existing methods and our DFormer.
-    </em>
-</p>
+This work builds upon the official implementation of **[DFormerv2](https://github.com/VCIP-RGBD/DFormer)**. The codebase also benefits greatly from the following outstanding projects:
 
-<p align="center">
-    <img src="figs/dformerv2_table.jpg" width="600"  width="1200"/> <br />
-    <em> 
-    Table 2: Comparisons between the existing methods and our DFormerv2.
-    </em>
-</p>
+* [Text-IF](https://github.com/XunpengYi/Text-IF)
+* [mmsegmentation](https://github.com/open-mmlab/mmsegmentation/tree/v0.24.1)
+* [CMX](https://github.com/huaaaliu/RGBX_Semantic_Segmentation)
+* [CMNeXt](https://github.com/jamycheung/DELIVER)
 
-## 🕙 ToDo
-- [ ] Tutorial on applying the DFormer encoder to the frameworks of other tasks
-- ~~[-] Release the code of RGB-D pre-training.~~
-- ~~[-] Tutorial on applying to a new dataset.~~
-- ~~[-] Release the DFormer code for RGB-D salient obejct detection.~~
-
-> We invite all to contribute in making it more acessible and useful. If you have any questions or suggestions about our work, feel free to contact me via e-mail (bowenyin@mail.nankai.edu.cn) or raise an issue. 
-
-
-## Reference
-You may want to cite:
-```
-@inproceedings{yin2024dformer,
-  title={DFormer: Rethinking RGBD Representation Learning for Semantic Segmentation},
-  author={Yin, Bowen and Zhang, Xuying and Li, Zhong-Yu and Liu, Li and Cheng, Ming-Ming and Hou, Qibin},
-  booktitle={ICLR},
-  year={2024}
-}
-
-@inproceedings{yin2025dformerv2,
-  title={DFormerv2: Geometry Self-Attention for RGBD Semantic Segmentation},
-  author={Yin, Bo-Wen and Cao, Jiao-Long and Cheng, Ming-Ming and Hou, Qibin},
-  booktitle={Proceedings of the Computer Vision and Pattern Recognition Conference},
-  pages={19345--19355},
-  year={2025}
-}
-```
-
-
-### Acknowledgment
-
-Our implementation is mainly based on [mmsegmentaion](https://github.com/open-mmlab/mmsegmentation/tree/v0.24.1), [CMX](https://github.com/huaaaliu/RGBX_Semantic_Segmentation) and [CMNext](https://github.com/jamycheung/DELIVER). Thanks for their authors.
-
+We sincerely thank the authors for their contributions. If you use this work in your research, please consider citing the original papers.
 
 
 ### License
 
 Code in this repo is for non-commercial use only.
-
-
-
-
-
-

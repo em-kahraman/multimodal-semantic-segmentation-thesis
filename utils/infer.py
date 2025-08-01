@@ -76,7 +76,7 @@ with Engine(custom_parser=parser) as engine:
         BatchNorm2d = nn.BatchNorm2d
 
     model = segmodel(cfg=config, norm_layer=BatchNorm2d)
-    weight = torch.load(args.continue_fpath)["model"]
+    weight = torch.load(args.continue_fpath)["state_dict"]
 
     print("load model")
     model.load_state_dict(weight, strict=False)

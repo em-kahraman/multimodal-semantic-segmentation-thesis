@@ -2,6 +2,7 @@ import os
 import cv2
 import torch
 import numpy as np
+import json
 
 import torch.utils.data as data
 
@@ -131,6 +132,26 @@ class RGBXDataset(data.Dataset):
         self.x_modal = setting.get("x_modal", ["d"])
         self.backbone = setting["backbone"]
 
+        # Load the text annotation data and create a lookup dictionary
+        self.text_lookup = {}
+        if "text_annotation_file" in setting and setting["text_annotation_file"]:
+            text_file_path = setting["text_annotation_file"]
+            absolute_path = os.path.abspath(text_file_path)
+            
+            if os.path.exists(absolute_path):
+                with open(absolute_path, 'r') as f:
+                    text_data_list = json.load(f)
+                    for item in text_data_list:
+                        # Key is the filename without extension
+                        filename = os.path.basename(item['rgb_path'])
+                        file_stem = os.path.splitext(filename)[0]
+                        self.text_lookup[file_stem] = item['description']
+        
+        if self.text_lookup:
+            print(f"\n DATASET DEBUG: Successfully loaded {len(self.text_lookup)} text descriptions.\n")
+        else:
+            print("\n DATASET DEBUG: WARNING! Text lookup dictionary is EMPTY. Check path and JSON content.\n")
+
     def __len__(self):
         if self._file_length is not None:
             return self._file_length
@@ -206,7 +227,15 @@ class RGBXDataset(data.Dataset):
         #     x = torch.from_numpy(np.ascontiguousarray(x)).float()
 
         output_dict = dict(data=rgb, label=gt, modal_x=x, fn=str(path_dict["rgb_path"]), n=len(self._file_names))
-
+        
+        # Add the text description to the output dictionary using the new lookup
+        if self.text_lookup:
+            image_filename = os.path.basename(path_dict["rgb_path"])
+            image_stem = os.path.splitext(image_filename)[0]
+            
+            text_description = self.text_lookup.get(image_stem, "")
+            output_dict['text'] = text_description
+        
         return output_dict
 
     def _get_file_names(self, split_name):

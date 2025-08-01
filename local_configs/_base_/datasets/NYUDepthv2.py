@@ -16,6 +16,10 @@ C.x_format = ".png"
 C.x_is_single_channel = True  # True for raw depth, thermal and aolp/dolp(not aolp/dolp tri) input
 C.train_source = osp.join(C.dataset_path, "train.txt")
 C.eval_source = osp.join(C.dataset_path, "test.txt")
+##########################################################################
+# Define the path to the text annotation file relative to the dataset path
+C.text_annotation_file = osp.join(C.dataset_path, "generated_rgb_descriptions.json")
+##########################################################################
 C.is_test = True
 C.num_train_imgs = 795
 C.num_eval_imgs = 654

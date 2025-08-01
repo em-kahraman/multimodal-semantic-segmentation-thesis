@@ -1,13 +1,13 @@
 # CUDA_VISIBLE_DEVICES=0,1
 # config -> which model config
 # continue_fpath -> the trained pth path
-GPUS=8
+GPUS=1
 NNODES=1
 NODE_RANK=${NODE_RANK:-0}
 PORT=${PORT:-29158}
 MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 
-export CUDA_VISIBLE_DEVICES="0,1,2,3,4,5,6,7"
+export CUDA_VISIBLE_DEVICES="0"
 export TORCHDYNAMO_VERBOSE=1
 
 PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
@@ -18,7 +18,7 @@ PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
     --nproc_per_node=$GPUS \
     --master_port=$PORT \
     utils/eval.py \
-    --config=local_configs.NYUDepthv2.DFormerv2_S \
+    --config=local_configs.NYUDepthv2.DFormerv2_S_text \
     --gpus=$GPUS \
     --sliding \
     --no-compile \
@@ -27,7 +27,7 @@ PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
     --compile_mode="reduce-overhead" \
     --amp \
     --pad_SUNRGBD \
-    --continue_fpath="checkpoints/trained/DFormerv2_Small_NYU.pth"
+    --continue_fpath="checkpoints/trained/NYUDepthv2/DFormerv2_Small_NYU.pth"
 
 # choose the dataset and DFormer for evaluating
 

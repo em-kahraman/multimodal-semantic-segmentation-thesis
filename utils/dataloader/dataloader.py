@@ -154,6 +154,8 @@ def get_train_loader(engine, dataset, config):
         "class_names": config.class_names,
         "dataset_name": config.dataset_name,
         "backbone": config.backbone,
+        # Pass the text annotation file path from the main config to the dataset settings
+        "text_annotation_file": config.text_annotation_file if hasattr(config, "text_annotation_file") else None
     }
     train_preprocess = TrainPre(config.norm_mean, config.norm_std, config.x_is_single_channel, config)
 
@@ -204,6 +206,8 @@ def get_val_loader(engine, dataset, config, val_batch_size=1):
         "class_names": config.class_names,
         "dataset_name": config.dataset_name,
         "backbone": config.backbone,
+        # Pass the text annotation file path from the main config to the dataset settings
+        "text_annotation_file": config.text_annotation_file if hasattr(config, "text_annotation_file") else None
     }
     val_preprocess = ValPre(config.norm_mean, config.norm_std, config.x_is_single_channel, config)
 

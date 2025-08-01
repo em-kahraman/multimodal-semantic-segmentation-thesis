@@ -113,6 +113,23 @@ class EncoderDecoder(nn.Module):
 
         self.aux_head = None
 
+        # START: MODULAR TEXT ENCODER SELECTION
+        self.text_encoder = None  # Initialize as None
+        if hasattr(cfg, "text_encoder") and cfg.text_encoder is not None:
+            if cfg.text_encoder == "CLIP":
+                logger.info("Using CLIP Text Encoder")
+                # Import the class from text encoder module file
+                from .text_encoders.clip_encoder import ClipTextEncoder
+                self.text_encoder = ClipTextEncoder()
+            # Add another text encoder
+            # elif cfg.text_encoder == "BERT":
+            #     logger.info("Using BERT Text Encoder")
+            #     from .text_encoders.bert_encoder import BertSemanticEncoder
+            #     self.text_encoder = BertSemanticEncoder(output_dim=cfg.decoder_embed_dim)
+            else:
+                raise NotImplementedError(f"Text Encoder {cfg.text_encoder} not implemented.")
+        # END: MODULAR TEXT ENCODER SELECTION
+
         if cfg.decoder == "MLPDecoder":
             logger.info("Using MLP Decoder")
             from .decoders.MLPDecoder import DecoderHead
@@ -144,6 +161,19 @@ class EncoderDecoder(nn.Module):
                 self.aux_rate = cfg.aux_rate
                 print("aux rate is set to", str(self.aux_rate))
                 self.aux_head = FCNHead(self.channels[2], cfg.num_classes, norm_layer=norm_layer)
+
+        ### ADDING TEXT GUIDED HAMBURGER DECODER ###
+        elif cfg.decoder == "TextGuidedHam":
+            logger.info("Using Text-Guided Ham Decoder")
+            from .decoders.text_guided_ham_head import TextGuidedHamHead as DecoderHead
+            self.decode_head = DecoderHead(
+                in_channels=self.channels[1:],
+                num_classes=cfg.num_classes,
+                in_index=[1, 2, 3],
+                norm_cfg=norm_cfg,
+                channels=cfg.decoder_embed_dim,
+            )
+        ############################################
 
         elif cfg.decoder == "UPernet":
             logger.info("Using Upernet Decoder")
@@ -222,7 +252,7 @@ class EncoderDecoder(nn.Module):
                 nonlinearity="relu",
             )
 
-    def encode_decode(self, rgb, modal_x):
+    def encode_decode(self, rgb, modal_x, text_descriptions=None): # Added text_descriptions
         """Encode images with backbone and decode into a semantic segmentation
         map of the same size as input."""
         orisize = rgb.shape
@@ -230,20 +260,33 @@ class EncoderDecoder(nn.Module):
         x = self.backbone(rgb, modal_x)
         if len(x) == 2:  # if output is (rgb,depth) only use rgb
             x = x[0]
-        out = self.decode_head.forward(x)
+
+        # Check if we are using a text-guided model
+        if self.text_encoder is not None and "Text" in self.cfg.decoder:
+            # Get the raw text embedding from the text encoder
+            text_embedding = self.text_encoder(text_descriptions)
+            # Pass the visual features and the text embedding to the decoder
+            out = self.decode_head.forward(x, text_embedding)
+        else:
+            # Original path for non-text models
+            out = self.decode_head.forward(x)
+
         out = F.interpolate(out, size=orisize[-2:], mode="bilinear", align_corners=False)
+
         if self.aux_head:
-            aux_fm = self.aux_head(x[0][self.aux_index])
+            # Note: aux_head doesn't get text guidance in this setup
+            aux_fm = self.aux_head(x[self.aux_index]) 
             aux_fm = F.interpolate(aux_fm, size=orisize[2:], mode="bilinear", align_corners=False)
             return out, aux_fm
         return out
 
-    def forward(self, rgb, modal_x=None, label=None):
+    def forward(self, rgb, modal_x=None, label=None, text_descriptions=None): # Added text_descriptions
         # print('builder',rgb.shape,modal_x.shape)
         if self.aux_head:
-            out, aux_fm = self.encode_decode(rgb, modal_x)
+            out, aux_fm = self.encode_decode(rgb, modal_x, text_descriptions=text_descriptions)
         else:
-            out = self.encode_decode(rgb, modal_x)
+            out = self.encode_decode(rgb, modal_x, text_descriptions=text_descriptions)
+
         if label is not None:
             loss = self.criterion(out, label.long())[label.long() != self.cfg.background].mean()
             if self.aux_head:

@@ -89,9 +89,11 @@ def evaluate(model, dataloader, config, device, engine, save_dir=None, sliding=F
             (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed)
         ):
             print(f"Validation Iter: {idx + 1} / {len(dataloader)}")
+        # Unpack all data from the minibatch, including the new 'text' key
         images = minibatch["data"]
         labels = minibatch["label"]
         modal_xs = minibatch["modal_x"]
+        text_descs = minibatch.get('text', None) # Use .get() for safety
         if len(images.shape) == 3:
             images = images.unsqueeze(0)
         if len(modal_xs.shape) == 3:
@@ -101,10 +103,17 @@ def evaluate(model, dataloader, config, device, engine, save_dir=None, sliding=F
         # print(images.shape,labels.shape)
         images = [images.to(device), modal_xs.to(device)]
         labels = labels.to(device)
+
+        # Conditionally pass text_descriptions to the model
         if sliding:
+            # Note: slide_inference function needs to be updated if we decide to use it
             preds = slide_inference(model, images, modal_xs, config).softmax(dim=1)
         else:
-            preds = model(images[0], images[1]).softmax(dim=1)
+            if "Text" in config.decoder and text_descs is not None:
+                preds = model(images[0], images[1], text_descriptions=text_descs).softmax(dim=1)
+            else:
+                preds = model(images[0], images[1]).softmax(dim=1)
+
         # print(preds.shape,labels.shape)
         B, H, W = labels.shape
         metrics.update(preds, labels)
@@ -179,6 +188,7 @@ def evaluate(model, dataloader, config, device, engine, save_dir=None, sliding=F
     return all_metrics
 
 
+# Note: slide_inference function needs to be updated if we decide to use it
 def slide_inference(model, imgs, modal_xs, config):
     """Inference by sliding-window with overlap.
 
@@ -264,9 +274,13 @@ def evaluate_msf(
             (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed)
         ):
             print(f"Validation Iter: {idx + 1} / {len(dataloader)}")
+
+        # Unpack all data from the minibatch, including the new 'text' key
         images = minibatch["data"]
         labels = minibatch["label"]
         modal_xs = minibatch["modal_x"]
+        text_descs = minibatch.get('text', None) # Use .get() for safety
+
         # print(images.shape,labels.shape)
         images = [images.to(device), modal_xs.to(device)]
         labels = labels.to(device)
@@ -283,19 +297,31 @@ def evaluate_msf(
                 F.interpolate(img, size=(new_H, new_W), mode="bilinear", align_corners=True) for img in images
             ]
             scaled_images = [scaled_img.to(device) for scaled_img in scaled_images]
+
+            # Conditionally pass text_descriptions for the main model call
             if sliding:
                 logits = slide_inference(model, scaled_images[0], scaled_images[1], config)
             else:
-                logits = model(scaled_images[0], scaled_images[1])
+                if "Text" in config.decoder and text_descs is not None:
+                    logits = model(scaled_images[0], scaled_images[1], text_descriptions=text_descs)
+                else:
+                    logits = model(scaled_images[0], scaled_images[1])
+
             logits = F.interpolate(logits, size=(H, W), mode="bilinear", align_corners=True)
             scaled_logits += logits.softmax(dim=1)
 
             if flip:
                 scaled_images = [torch.flip(scaled_img, dims=(3,)) for scaled_img in scaled_images]
+
+                # Conditionally pass text_descriptions for the flipped model call
                 if sliding:
                     logits = slide_inference(model, scaled_images[0], scaled_images[1], config)
                 else:
-                    logits = model(scaled_images[0], scaled_images[1])
+                    if "Text" in config.decoder and text_descs is not None:
+                        logits = model(scaled_images[0], scaled_images[1], text_descriptions=text_descs)
+                    else:
+                        logits = model(scaled_images[0], scaled_images[1])
+                
                 logits = torch.flip(logits, dims=(3,))
                 logits = F.interpolate(logits, size=(H, W), mode="bilinear", align_corners=True)
                 scaled_logits += logits.softmax(dim=1)
