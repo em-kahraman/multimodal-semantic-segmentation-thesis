@@ -3,7 +3,7 @@ from .._base_.datasets.NYUDepthv2 import *
 """ Settings for network, this would be different for each kind of model"""
 C.backbone = "DFormerv2_S"
 C.pretrained_model = "checkpoints/pretrained/DFormerv2_Small_pretrained.pth"
-C.decoder = "TextGuidedHam"
+C.decoder = "HierarchicalTextDecoder"
 C.text_encoder = "CLIP"
 C.text_annotation_file = "datasets/NYUDepthv2/generated_rgb_descriptions.json" # Remember to add the path
 C.decoder_embed_dim = 512
@@ -35,7 +35,7 @@ C.eval_flip = True  # False #
 C.eval_crop_size = [480, 640]  # [height weight]
 
 """Store Config"""
-C.checkpoint_start_epoch = 250
+C.checkpoint_start_epoch = 200
 C.checkpoint_step = 25
 
 """Path Config"""

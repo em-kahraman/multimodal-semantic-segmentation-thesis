@@ -162,10 +162,21 @@ class EncoderDecoder(nn.Module):
                 print("aux rate is set to", str(self.aux_rate))
                 self.aux_head = FCNHead(self.channels[2], cfg.num_classes, norm_layer=norm_layer)
 
-        ### ADDING TEXT GUIDED HAMBURGER DECODER ###
+        ### ADDING TEXT GUIDED DECODERS ###
         elif cfg.decoder == "TextGuidedHam":
             logger.info("Using Text-Guided Ham Decoder")
             from .decoders.text_guided_ham_head import TextGuidedHamHead as DecoderHead
+            self.decode_head = DecoderHead(
+                in_channels=self.channels[1:],
+                num_classes=cfg.num_classes,
+                in_index=[1, 2, 3],
+                norm_cfg=norm_cfg,
+                channels=cfg.decoder_embed_dim,
+            )
+
+        elif cfg.decoder == "HierarchicalTextDecoder":
+            logger.info("Using Hierarchical Text Decoder")
+            from .decoders.hierarchical_text_decoder import HierarchicalTextDecoder as DecoderHead
             self.decode_head = DecoderHead(
                 in_channels=self.channels[1:],
                 num_classes=cfg.num_classes,
