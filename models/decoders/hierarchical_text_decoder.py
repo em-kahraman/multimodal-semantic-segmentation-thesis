@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import ConvModule
-from mmseg.ops import resize
 from einops import rearrange
 import numbers
 
 from .decode_head import BaseDecodeHead
+from .layers import ConvModule
 
 def to_3d(x):
     return rearrange(x, 'b c h w -> b (h w) c')
@@ -163,7 +162,7 @@ class HierarchicalTextDecoder(BaseDecodeHead):
         self.refinement = TransformerBlock(dim=s2_channels, num_heads=2)
         self.output_conv = ConvModule(
             s2_channels, self.channels, 1,
-            conv_cfg=self.conv_cfg, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg
+            norm_cfg=self.norm_cfg, act_cfg=self.act_cfg
         )
 
 

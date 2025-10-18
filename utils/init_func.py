@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-# from models.encoders.DFormer import LayerNorm
-# from mmseg.models.decode_heads.mask_attention_cot import LayerNorm as LayerNorm1
 
 
 def __init_weight(feature, conv_init, norm_layer, bn_eps, bn_momentum, **kwargs):

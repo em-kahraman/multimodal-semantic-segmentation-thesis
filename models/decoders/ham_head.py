@@ -1,12 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from mmcv.cnn import ConvModule
-
-from mmseg.ops import resize
-
-# from ..builder import HEADS
 from .decode_head import BaseDecodeHead
+from .layers import ConvModule
 
 
 class _MatrixDecomposition2DBase(nn.Module):
@@ -37,7 +33,7 @@ class _MatrixDecomposition2DBase(nn.Module):
         print("eta", self.eta)
         print("rand_init", self.rand_init)
 
-    def _build_bases(self, B, S, D, R, cuda=False):
+    def _build_bases(self, B, S, D, R, device="cpu"):
         raise NotImplementedError
 
     def local_step(self, x, bases, coef):
@@ -72,12 +68,12 @@ class _MatrixDecomposition2DBase(nn.Module):
             x = x.view(B * self.S, N, D).transpose(1, 2)
 
         if not self.rand_init and not hasattr(self, "bases"):
-            bases = self._build_bases(1, self.S, D, self.R, cuda=True)
+            bases = self._build_bases(1, self.S, D, self.R, device=x.device)
             self.register_buffer("bases", bases)
 
         # (S, D, R) -> (B * S, D, R)
         if self.rand_init:
-            bases = self._build_bases(B, self.S, D, self.R, cuda=True)
+            bases = self._build_bases(B, self.S, D, self.R, device=x.device)
         else:
             bases = self.bases.repeat(B, 1, 1)
 
@@ -107,11 +103,8 @@ class NMF2D(_MatrixDecomposition2DBase):
 
         self.inv_t = 1
 
-    def _build_bases(self, B, S, D, R, cuda=False):
-        if cuda:
-            bases = torch.rand((B * S, D, R)).cuda()
-        else:
-            bases = torch.rand((B * S, D, R))
+    def _build_bases(self, B, S, D, R, device="cpu"):
+        bases = torch.rand((B * S, D, R)).to(device)
 
         bases = F.normalize(bases, dim=1)
 
@@ -187,7 +180,6 @@ class LightHamHead(BaseDecodeHead):
             sum(self.in_channels),
             self.ham_channels,
             1,
-            conv_cfg=self.conv_cfg,
             norm_cfg=self.norm_cfg,
             act_cfg=self.act_cfg,
         )
@@ -195,7 +187,7 @@ class LightHamHead(BaseDecodeHead):
         self.hamburger = Hamburger(ham_channels, ham_kwargs, **kwargs)
 
         self.align = ConvModule(
-            self.ham_channels, self.channels, 1, conv_cfg=self.conv_cfg, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg
+            self.ham_channels, self.channels, 1, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg
         )
 
     def forward(self, inputs):
@@ -203,7 +195,7 @@ class LightHamHead(BaseDecodeHead):
         inputs = self._transform_inputs(inputs)
 
         inputs = [
-            resize(level, size=inputs[0].shape[2:], mode="bilinear", align_corners=self.align_corners)
+            F.interpolate(level, size=inputs[0].shape[2:], mode="bilinear", align_corners=self.align_corners)
             for level in inputs
         ]
 

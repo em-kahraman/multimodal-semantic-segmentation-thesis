@@ -1,63 +1,34 @@
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.init_func import init_weight
-from utils.load_utils import load_pretrain
-from functools import partial
-
 from utils.engine.logger import get_logger
-import warnings
-
-# from mmcv.cnn import MODELS as MMCV_MODELS
-# from mmcv.cnn.bricks.registry import ATTENTION as MMCV_ATTENTION
-# from mmcv.utils import Registry
-
-# MODELS = Registry('models', parent=MMCV_MODELS)
-# ATTENTION = Registry('attention', parent=MMCV_ATTENTION)
-
-# BACKBONES = MODELS
-# NECKS = MODELS
-# HEADS = MODELS
-# LOSSES = MODELS
-# SEGMENTORS = MODELS
-
-
-def build_backbone(cfg):
-    """Build backbone."""
-    return BACKBONES.build(cfg)
-
-
-def build_neck(cfg):
-    """Build neck."""
-    return NECKS.build(cfg)
-
-
-def build_head(cfg):
-    """Build head."""
-    return HEADS.build(cfg)
-
-
-def build_loss(cfg):
-    """Build loss."""
-    return LOSSES.build(cfg)
-
-
-def build_segmentor(cfg, train_cfg=None, test_cfg=None):
-    """Build segmentor."""
-    if train_cfg is not None or test_cfg is not None:
-        warnings.warn("train_cfg and test_cfg is deprecated, please specify them in model", UserWarning)
-    assert cfg.get("train_cfg") is None or train_cfg is None, (
-        "train_cfg specified in both outer field and model field "
-    )
-    assert cfg.get("test_cfg") is None or test_cfg is None, "test_cfg specified in both outer field and model field "
-    return SEGMENTORS.build(cfg, default_args=dict(train_cfg=train_cfg, test_cfg=test_cfg))
-
+from utils.init_func import init_weight
 
 logger = get_logger()
 
+# Channel dimensions of the four encoder stages
+BACKBONE_CHANNELS = {
+    "DFormerv2_S": [64, 128, 256, 512],
+    "DFormerv2_B": [80, 160, 320, 512],
+    "DFormerv2_L": [112, 224, 448, 640],
+}
+
+
+def build_text_encoder(name):
+    if name == "CLIP":
+        from .text_encoders.clip_encoder import ClipTextEncoder
+
+        return ClipTextEncoder()
+    raise NotImplementedError(f"Text encoder {name} not implemented.")
+
 
 class EncoderDecoder(nn.Module):
+    """DFormerv2 RGB-D encoder + (optionally text-guided) decoder.
+
+    Text guidance is enabled by setting `cfg.text_encoder`. The frozen text encoder turns the
+    image captions into embeddings that the decoder uses to modulate the visual features.
+    """
+
     def __init__(
         self,
         cfg=None,
@@ -65,178 +36,55 @@ class EncoderDecoder(nn.Module):
         norm_layer=nn.BatchNorm2d,
         syncbn=False,
     ):
-        super(EncoderDecoder, self).__init__()
+        super().__init__()
         self.norm_layer = norm_layer
         self.cfg = cfg
 
-        if cfg.backbone == "DFormer-Large":
-            from .encoders.DFormer import DFormer_Large as backbone
+        if cfg.backbone not in BACKBONE_CHANNELS:
+            raise NotImplementedError(f"Backbone {cfg.backbone} not implemented.")
+        from .encoders import DFormerv2
 
-            self.channels = [96, 192, 288, 576]
-        elif cfg.backbone == "DFormer-Base":
-            from .encoders.DFormer import DFormer_Base as backbone
+        backbone = getattr(DFormerv2, cfg.backbone)
+        self.channels = BACKBONE_CHANNELS[cfg.backbone]
 
-            self.channels = [64, 128, 256, 512]
-        elif cfg.backbone == "DFormer-Small":
-            from .encoders.DFormer import DFormer_Small as backbone
+        norm_cfg = dict(type="SyncBN" if syncbn else "BN", requires_grad=True)
+        drop_path_rate = cfg.drop_path_rate if cfg.drop_path_rate is not None else 0.1
+        self.backbone = backbone(drop_path_rate=drop_path_rate, norm_cfg=norm_cfg)
 
-            self.channels = [64, 128, 256, 512]
-        elif cfg.backbone == "DFormer-Tiny":
-            from .encoders.DFormer import DFormer_Tiny as backbone
-
-            self.channels = [32, 64, 128, 256]
-
-        elif cfg.backbone == "DFormerv2_L":
-            from .encoders.DFormerv2 import DFormerv2_L as backbone
-
-            self.channels = [112, 224, 448, 640]
-        elif cfg.backbone == "DFormerv2_B":
-            from .encoders.DFormerv2 import DFormerv2_B as backbone
-
-            self.channels = [80, 160, 320, 512]
-        elif cfg.backbone == "DFormerv2_S":
-            from .encoders.DFormerv2 import DFormerv2_S as backbone
-
-            self.channels = [64, 128, 256, 512]
+        text_encoder_name = getattr(cfg, "text_encoder", None)
+        if text_encoder_name is not None:
+            logger.info(f"Using {text_encoder_name} text encoder")
+            self.text_encoder = build_text_encoder(text_encoder_name)
         else:
-            raise NotImplementedError
+            self.text_encoder = None
 
-        if syncbn:
-            norm_cfg = dict(type="SyncBN", requires_grad=True)
-        else:
-            norm_cfg = dict(type="BN", requires_grad=True)
-
-        if cfg.drop_path_rate is not None:
-            self.backbone = backbone(drop_path_rate=cfg.drop_path_rate, norm_cfg=norm_cfg)
-        else:
-            self.backbone = backbone(drop_path_rate=0.1, norm_cfg=norm_cfg)
-
-        self.aux_head = None
-
-        # START: MODULAR TEXT ENCODER SELECTION
-        self.text_encoder = None  # Initialize as None
-        if hasattr(cfg, "text_encoder") and cfg.text_encoder is not None:
-            if cfg.text_encoder == "CLIP":
-                logger.info("Using CLIP Text Encoder")
-                # Import the class from text encoder module file
-                from .text_encoders.clip_encoder import ClipTextEncoder
-                self.text_encoder = ClipTextEncoder()
-            # Add another text encoder
-            # elif cfg.text_encoder == "BERT":
-            #     logger.info("Using BERT Text Encoder")
-            #     from .text_encoders.bert_encoder import BertSemanticEncoder
-            #     self.text_encoder = BertSemanticEncoder(output_dim=cfg.decoder_embed_dim)
-            else:
-                raise NotImplementedError(f"Text Encoder {cfg.text_encoder} not implemented.")
-        # END: MODULAR TEXT ENCODER SELECTION
-
-        if cfg.decoder == "MLPDecoder":
-            logger.info("Using MLP Decoder")
-            from .decoders.MLPDecoder import DecoderHead
-
-            self.decode_head = DecoderHead(
-                in_channels=self.channels,
-                num_classes=cfg.num_classes,
-                norm_layer=norm_layer,
-                embed_dim=cfg.decoder_embed_dim,
-            )
-
-        elif cfg.decoder == "ham":
+        head_kwargs = dict(
+            in_channels=self.channels[1:],
+            num_classes=cfg.num_classes,
+            in_index=[1, 2, 3],
+            norm_cfg=norm_cfg,
+            channels=cfg.decoder_embed_dim,
+        )
+        if cfg.decoder == "ham":
             logger.info("Using Ham Decoder")
-            print(cfg.num_classes)
-            from .decoders.ham_head import LightHamHead as DecoderHead
+            from .decoders.ham_head import LightHamHead
 
-            # from mmseg.models.decode_heads.ham_head import LightHamHead as DecoderHead
-            self.decode_head = DecoderHead(
-                in_channels=self.channels[1:],
-                num_classes=cfg.num_classes,
-                in_index=[1, 2, 3],
-                norm_cfg=norm_cfg,
-                channels=cfg.decoder_embed_dim,
-            )
-            from .decoders.fcnhead import FCNHead
-
-            if cfg.aux_rate != 0:
-                self.aux_index = 2
-                self.aux_rate = cfg.aux_rate
-                print("aux rate is set to", str(self.aux_rate))
-                self.aux_head = FCNHead(self.channels[2], cfg.num_classes, norm_layer=norm_layer)
-
-        ### ADDING TEXT GUIDED DECODERS ###
-        elif cfg.decoder == "TextGuidedHam":
-            logger.info("Using Text-Guided Ham Decoder")
-            from .decoders.text_guided_ham_head import TextGuidedHamHead as DecoderHead
-            self.decode_head = DecoderHead(
-                in_channels=self.channels[1:],
-                num_classes=cfg.num_classes,
-                in_index=[1, 2, 3],
-                norm_cfg=norm_cfg,
-                channels=cfg.decoder_embed_dim,
-            )
-
+            self.decode_head = LightHamHead(**head_kwargs)
         elif cfg.decoder == "HierarchicalTextDecoder":
             logger.info("Using Hierarchical Text Decoder")
-            from .decoders.hierarchical_text_decoder import HierarchicalTextDecoder as DecoderHead
-            self.decode_head = DecoderHead(
-                in_channels=self.channels[1:],
-                num_classes=cfg.num_classes,
-                in_index=[1, 2, 3],
-                norm_cfg=norm_cfg,
-                channels=cfg.decoder_embed_dim,
-            )
-        ############################################
+            from .decoders.hierarchical_text_decoder import HierarchicalTextDecoder
 
-        elif cfg.decoder == "UPernet":
-            logger.info("Using Upernet Decoder")
-            from .decoders.UPernet import UPerHead
-
-            self.decode_head = UPerHead(
-                in_channels=self.channels, num_classes=cfg.num_classes, norm_layer=norm_layer, channels=512
-            )
-            from .decoders.fcnhead import FCNHead
-
-            self.aux_index = 2
-            self.aux_rate = 0.4
-            self.aux_head = FCNHead(self.channels[2], cfg.num_classes, norm_layer=norm_layer)
-
-        elif cfg.decoder == "deeplabv3+":
-            logger.info("Using Decoder: DeepLabV3+")
-            from .decoders.deeplabv3plus import DeepLabV3Plus as Head
-
-            self.decode_head = Head(in_channels=self.channels, num_classes=cfg.num_classes, norm_layer=norm_layer)
-            from .decoders.fcnhead import FCNHead
-
-            self.aux_index = 2
-            self.aux_rate = 0.4
-            self.aux_head = FCNHead(self.channels[2], cfg.num_classes, norm_layer=norm_layer)
-        elif cfg.decoder == "nl":
-            logger.info("Using Decoder: nl+")
-            from .decoders.nl_head import NLHead as Head
-
-            self.decode_head = Head(
-                in_channels=self.channels[1:],
-                in_index=[1, 2, 3],
-                num_classes=cfg.num_classes,
-                norm_cfg=norm_cfg,
-                channels=512,
-            )
-            from .decoders.fcnhead import FCNHead
-
-            self.aux_index = 2
-            self.aux_rate = 0.4
-            self.aux_head = FCNHead(self.channels[2], cfg.num_classes, norm_layer=norm_layer)
-
+            self.decode_head = HierarchicalTextDecoder(**head_kwargs)
         else:
-            logger.info("No decoder(FCN-32s)")
-            from .decoders.fcnhead import FCNHead
-
-            self.decode_head = FCNHead(
-                in_channels=self.channels[-1], kernel_size=3, num_classes=cfg.num_classes, norm_layer=norm_layer
-            )
+            raise NotImplementedError(f"Decoder {cfg.decoder} not implemented.")
 
         self.criterion = criterion
         if self.criterion:
             self.init_weights(cfg, pretrained=cfg.pretrained_model)
+
+    @property
+    def uses_text(self):
+        return self.text_encoder is not None
 
     def init_weights(self, cfg, pretrained=None):
         if pretrained:
@@ -252,57 +100,24 @@ class EncoderDecoder(nn.Module):
             mode="fan_in",
             nonlinearity="relu",
         )
-        if self.aux_head:
-            init_weight(
-                self.aux_head,
-                nn.init.kaiming_normal_,
-                self.norm_layer,
-                cfg.bn_eps,
-                cfg.bn_momentum,
-                mode="fan_in",
-                nonlinearity="relu",
-            )
 
-    def encode_decode(self, rgb, modal_x, text_descriptions=None): # Added text_descriptions
-        """Encode images with backbone and decode into a semantic segmentation
-        map of the same size as input."""
-        orisize = rgb.shape
-        # print('builder',rgb.shape,modal_x.shape)
+    def encode_decode(self, rgb, modal_x, text_descriptions=None):
+        """Encode images with the backbone and decode them into a segmentation map of the input size."""
         x = self.backbone(rgb, modal_x)
-        if len(x) == 2:  # if output is (rgb,depth) only use rgb
+        if len(x) == 2:  # if output is (rgb, depth) only use rgb
             x = x[0]
 
-        # Check if we are using a text-guided model
-        if self.text_encoder is not None and "Text" in self.cfg.decoder:
-            # Get the raw text embedding from the text encoder
-            text_embedding = self.text_encoder(text_descriptions)
-            # Pass the visual features and the text embedding to the decoder
-            out = self.decode_head.forward(x, text_embedding)
+        if self.uses_text:
+            if text_descriptions is None:
+                raise ValueError("This model is text-guided, but no text descriptions were given.")
+            out = self.decode_head(x, self.text_encoder(text_descriptions))
         else:
-            # Original path for non-text models
-            out = self.decode_head.forward(x)
+            out = self.decode_head(x)
 
-        out = F.interpolate(out, size=orisize[-2:], mode="bilinear", align_corners=False)
+        return F.interpolate(out, size=rgb.shape[-2:], mode="bilinear", align_corners=False)
 
-        if self.aux_head:
-            # Note: aux_head doesn't get text guidance in this setup
-            aux_fm = self.aux_head(x[self.aux_index]) 
-            aux_fm = F.interpolate(aux_fm, size=orisize[2:], mode="bilinear", align_corners=False)
-            return out, aux_fm
-        return out
-
-    def forward(self, rgb, modal_x=None, label=None, text_descriptions=None): # Added text_descriptions
-        # print('builder',rgb.shape,modal_x.shape)
-        if self.aux_head:
-            out, aux_fm = self.encode_decode(rgb, modal_x, text_descriptions=text_descriptions)
-        else:
-            out = self.encode_decode(rgb, modal_x, text_descriptions=text_descriptions)
-
+    def forward(self, rgb, modal_x=None, label=None, text_descriptions=None):
+        out = self.encode_decode(rgb, modal_x, text_descriptions=text_descriptions)
         if label is not None:
-            loss = self.criterion(out, label.long())[label.long() != self.cfg.background].mean()
-            if self.aux_head:
-                loss += (
-                    self.aux_rate * self.criterion(aux_fm, label.long())[label.long() != self.cfg.background].mean()
-                )
-            return loss
+            return self.criterion(out, label.long())[label.long() != self.cfg.background].mean()
         return out

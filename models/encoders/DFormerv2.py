@@ -16,12 +16,12 @@ import torch.utils.checkpoint as checkpoint
 import math
 from timm.models.layers import DropPath, trunc_normal_
 from typing import List
-from mmengine.runner.checkpoint import load_state_dict
-from mmengine.runner.checkpoint import load_checkpoint
 from typing import Tuple
 import sys
 import os
 from collections import OrderedDict
+
+from utils.load_utils import load_state_dict
 
 
 class LayerNorm2d(nn.Module):
@@ -602,8 +602,6 @@ class dformerv2(nn.Module):
                     state_dict[k] = v
             print("load " + pretrained)
             load_state_dict(self, state_dict, strict=False)
-            # load_checkpoint(self, pretrained, strict=False)
-            # load_checkpoint(self, pretrained, strict=False, logger=logger)
         elif pretrained is None:
             self.apply(_init_weights)
         else:
