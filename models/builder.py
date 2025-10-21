@@ -19,6 +19,10 @@ def build_text_encoder(name):
         from .text_encoders.clip_encoder import ClipTextEncoder
 
         return ClipTextEncoder()
+    if name == "JinaCLIPv2":
+        from .text_encoders.jinaclipv2_encoder import JinaClipv2TextEncoder
+
+        return JinaClipv2TextEncoder()
     raise NotImplementedError(f"Text encoder {name} not implemented.")
 
 
@@ -55,8 +59,10 @@ class EncoderDecoder(nn.Module):
         if text_encoder_name is not None:
             logger.info(f"Using {text_encoder_name} text encoder")
             self.text_encoder = build_text_encoder(text_encoder_name)
+            text_embed_dim = self.text_encoder.embed_dim
         else:
             self.text_encoder = None
+            text_embed_dim = None
 
         head_kwargs = dict(
             in_channels=self.channels[1:],
@@ -74,7 +80,7 @@ class EncoderDecoder(nn.Module):
             logger.info("Using Hierarchical Text Decoder")
             from .decoders.hierarchical_text_decoder import HierarchicalTextDecoder
 
-            self.decode_head = HierarchicalTextDecoder(**head_kwargs)
+            self.decode_head = HierarchicalTextDecoder(text_embed_dim=text_embed_dim, **head_kwargs)
         else:
             raise NotImplementedError(f"Decoder {cfg.decoder} not implemented.")
 

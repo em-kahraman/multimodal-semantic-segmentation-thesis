@@ -4,7 +4,7 @@ from .._base_.datasets.NYUDepthv2 import *
 C.backbone = "DFormerv2_S"
 C.pretrained_model = "checkpoints/pretrained/DFormerv2_Small_pretrained.pth"
 C.decoder = "HierarchicalTextDecoder"
-C.text_encoder = "CLIP"
+C.text_encoder = "JinaCLIPv2"
 C.text_annotation_file = "captions/NYUDepthv2/llava-next.json"
 C.decoder_embed_dim = 512
 C.optimizer = "AdamW"

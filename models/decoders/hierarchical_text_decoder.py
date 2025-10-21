@@ -128,10 +128,10 @@ class HierarchicalTextDecoder(BaseDecodeHead):
     """
     Hierarchical, text-guided decoder inspired by Text-IF.
     """
-    def __init__(self, num_transformer_blocks=2, **kwargs):
+    def __init__(self, num_transformer_blocks=2, text_embed_dim=512, **kwargs):
         super(HierarchicalTextDecoder, self).__init__(input_transform="multiple_select", **kwargs)
         
-        self.text_embed_dim = 512 # CLIP's embedding dimension
+        self.text_embed_dim = text_embed_dim  # set by the text encoder
         
         # DFormerv2-S channel dimensions for stages 2, 3, 4
         s2_channels, s3_channels, s4_channels = self.in_channels 

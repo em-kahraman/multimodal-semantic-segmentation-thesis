@@ -1,39 +1,24 @@
-import torch
 import torch.nn as nn
-from transformers import CLIPModel, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer
 
-class ClipTextEncoder(nn.Module): # Renamed for clarity
-    """
-    Standalone module to encode text descriptions into a feature embedding.
-    """
-    def __init__(self):
+
+class ClipTextEncoder(nn.Module):
+    """Frozen CLIP text encoder. Captions are truncated to CLIP's 77-token context."""
+
+    def __init__(self, model_name="openai/clip-vit-base-patch32"):
         super().__init__()
-        self.clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-        self.tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
-
-        # Freeze the CLIP text model to preserve linguistic knowledge
-        for param in self.clip_model.text_model.parameters():
-            param.requires_grad = False
+        self.text_model = CLIPTextModel.from_pretrained(model_name)
+        self.tokenizer = CLIPTokenizer.from_pretrained(model_name)
+        self.text_model.requires_grad_(False)
+        self.embed_dim = self.text_model.config.hidden_size
 
     def forward(self, text_descriptions):
-        """
-        Args:
-            text_descriptions (list of str): The batch of text descriptions.
-        
-        Returns:
-            text_embedding (Tensor): The raw text feature embedding from CLIP.
-        """
-        # Add truncation=True to handle long captions, it will cut off text longer than the model can handle
-        # Also explicitly set the max_length from the model's config for robustness
+        """Encode a list of strings into a (B, embed_dim) tensor (pooled output of the text transformer)."""
         inputs = self.tokenizer(
             text=text_descriptions,
             padding=True,
             truncation=True,
-            max_length=self.clip_model.config.text_config.max_position_embeddings, # usually 77 for CLIP
-            return_tensors="pt"
-        ).to(self.clip_model.device)
-        
-        text_outputs = self.clip_model.text_model(**inputs)
-        text_embedding = text_outputs.pooler_output
-        
-        return text_embedding
+            max_length=self.text_model.config.max_position_embeddings,
+            return_tensors="pt",
+        ).to(self.text_model.device)
+        return self.text_model(**inputs).pooler_output
