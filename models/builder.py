@@ -77,10 +77,15 @@ class EncoderDecoder(nn.Module):
 
             self.decode_head = LightHamHead(**head_kwargs)
         elif cfg.decoder == "HierarchicalTextDecoder":
-            logger.info("Using Hierarchical Text Decoder")
+            logger.info(f"Using Hierarchical Text Decoder with {cfg.attention} attention")
             from .decoders.hierarchical_text_decoder import HierarchicalTextDecoder
 
-            self.decode_head = HierarchicalTextDecoder(text_embed_dim=text_embed_dim, **head_kwargs)
+            self.decode_head = HierarchicalTextDecoder(
+                attention=cfg.attention,
+                text_embed_dim=text_embed_dim,
+                seq_lens=getattr(cfg, "linformer_seq_lens", None),
+                **head_kwargs,
+            )
         else:
             raise NotImplementedError(f"Decoder {cfg.decoder} not implemented.")
 
