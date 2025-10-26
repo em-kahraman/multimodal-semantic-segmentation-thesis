@@ -108,7 +108,8 @@ class HierarchicalTextDecoder(BaseDecodeHead):
 
     Args:
         attention (str): Self-attention used in the transformer blocks, see `attention.ATTENTION`.
-        text_embed_dim (int): Size of the text embedding.
+        text_embed_dim (int|None): Size of the text embedding. None disables text guidance
+            (the SIGM modules are not created), which gives the no-text ablation.
         num_transformer_blocks (int): Transformer blocks per decoder level.
         attention_kwargs (dict|None): Extra arguments for the attention module.
         seq_lens (list[int]|None): Maximum sequence lengths (H*W) of the stage 2, 3 and 4 features.
@@ -118,13 +119,14 @@ class HierarchicalTextDecoder(BaseDecodeHead):
     def __init__(
         self,
         attention="mha",
-        text_embed_dim=512,
+        text_embed_dim=None,
         num_transformer_blocks=2,
         attention_kwargs=None,
         seq_lens=None,
         **kwargs,
     ):
         super().__init__(input_transform="multiple_select", **kwargs)
+        self.use_text = text_embed_dim is not None
         if attention == "linformer" and (seq_lens is None or len(seq_lens) != 3):
             raise ValueError("Linformer needs `seq_lens` with the sequence lengths of stages 2, 3 and 4.")
         attention_kwargs = attention_kwargs or {}
@@ -138,19 +140,22 @@ class HierarchicalTextDecoder(BaseDecodeHead):
                 layers.append(TransformerBlock(dim, attn))
             return nn.Sequential(*layers)
 
+        def guidance(channels):
+            return TextGuidanceModule(text_embed_dim, channels) if self.use_text else None
+
         # Level 4
-        self.prompt_guidance_4 = TextGuidanceModule(text_embed_dim, s4_channels)
+        self.prompt_guidance_4 = guidance(s4_channels)
         self.decoder_level4 = blocks(s4_channels, 8, 2, num_transformer_blocks)
 
         # Level 3
         self.up4_3 = nn.ConvTranspose2d(s4_channels, s3_channels, kernel_size=4, stride=2, padding=1)
-        self.prompt_guidance_3 = TextGuidanceModule(text_embed_dim, s3_channels)
+        self.prompt_guidance_3 = guidance(s3_channels)
         self.reduce_chan_level3 = nn.Conv2d(s3_channels * 2, s3_channels, kernel_size=1, bias=False)
         self.decoder_level3 = blocks(s3_channels, 4, 1, num_transformer_blocks)
 
         # Level 2
         self.up3_2 = nn.ConvTranspose2d(s3_channels, s2_channels, kernel_size=4, stride=2, padding=1)
-        self.prompt_guidance_2 = TextGuidanceModule(text_embed_dim, s2_channels)
+        self.prompt_guidance_2 = guidance(s2_channels)
         self.reduce_chan_level2 = nn.Conv2d(s2_channels * 2, s2_channels, kernel_size=1, bias=False)
         self.decoder_level2 = blocks(s2_channels, 2, 0, num_transformer_blocks)
 
@@ -158,15 +163,20 @@ class HierarchicalTextDecoder(BaseDecodeHead):
         self.refinement = blocks(s2_channels, 2, 0, 1)[0]
         self.output_conv = ConvModule(s2_channels, self.channels, 1, norm_cfg=self.norm_cfg, act_cfg=self.act_cfg)
 
-    def forward(self, inputs, text_embedding):
+    def _guide(self, module, features, text_embedding):
+        return module(features, text_embedding) if self.use_text else features
+
+    def forward(self, inputs, text_embedding=None):
+        if self.use_text and text_embedding is None:
+            raise ValueError("This decoder is text-guided, but no text embedding was given.")
         features_s2, features_s3, features_s4 = self._transform_inputs(inputs)
 
-        decoded_s4 = self.decoder_level4(self.prompt_guidance_4(features_s4, text_embedding))
+        decoded_s4 = self.decoder_level4(self._guide(self.prompt_guidance_4, features_s4, text_embedding))
 
-        upsampled_3 = self.prompt_guidance_3(self.up4_3(decoded_s4), text_embedding)
+        upsampled_3 = self._guide(self.prompt_guidance_3, self.up4_3(decoded_s4), text_embedding)
         decoded_s3 = self.decoder_level3(self.reduce_chan_level3(torch.cat([upsampled_3, features_s3], dim=1)))
 
-        upsampled_2 = self.prompt_guidance_2(self.up3_2(decoded_s3), text_embedding)
+        upsampled_2 = self._guide(self.prompt_guidance_2, self.up3_2(decoded_s3), text_embedding)
         decoded_s2 = self.decoder_level2(self.reduce_chan_level2(torch.cat([upsampled_2, features_s2], dim=1)))
 
         output = self.output_conv(self.refinement(decoded_s2))

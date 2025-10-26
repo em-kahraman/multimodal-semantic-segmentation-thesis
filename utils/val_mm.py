@@ -89,11 +89,10 @@ def evaluate(model, dataloader, config, device, engine, save_dir=None, sliding=F
             (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed)
         ):
             print(f"Validation Iter: {idx + 1} / {len(dataloader)}")
-        # Unpack all data from the minibatch, including the new 'text' key
         images = minibatch["data"]
         labels = minibatch["label"]
         modal_xs = minibatch["modal_x"]
-        text_descs = minibatch.get('text', None) # Use .get() for safety
+        text_descs = minibatch.get("text")  # only present for text-guided configs
         if len(images.shape) == 3:
             images = images.unsqueeze(0)
         if len(modal_xs.shape) == 3:
@@ -104,15 +103,10 @@ def evaluate(model, dataloader, config, device, engine, save_dir=None, sliding=F
         images = [images.to(device), modal_xs.to(device)]
         labels = labels.to(device)
 
-        # Conditionally pass text_descriptions to the model
         if sliding:
-            # Note: slide_inference function needs to be updated if we decide to use it
-            preds = slide_inference(model, images, modal_xs, config).softmax(dim=1)
+            preds = slide_inference(model, images[0], images[1], config, text_descriptions=text_descs).softmax(dim=1)
         else:
-            if "Text" in config.decoder and text_descs is not None:
-                preds = model(images[0], images[1], text_descriptions=text_descs).softmax(dim=1)
-            else:
-                preds = model(images[0], images[1]).softmax(dim=1)
+            preds = model(images[0], images[1], text_descriptions=text_descs).softmax(dim=1)
 
         # print(preds.shape,labels.shape)
         B, H, W = labels.shape
@@ -188,8 +182,7 @@ def evaluate(model, dataloader, config, device, engine, save_dir=None, sliding=F
     return all_metrics
 
 
-# Note: slide_inference function needs to be updated if we decide to use it
-def slide_inference(model, imgs, modal_xs, config):
+def slide_inference(model, imgs, modal_xs, config, text_descriptions=None):
     """Inference by sliding-window with overlap.
 
     If h_crop > h_img or w_crop > w_img, the small patch will be used to
@@ -239,7 +232,7 @@ def slide_inference(model, imgs, modal_xs, config):
             crop_modal_xs = modal_xs[:, :, y1:y2, x1:x2]
             # the output of encode_decode is seg logits tensor map
             # with shape [N, C, H, W]
-            crop_seg_logit = model(crop_img, crop_modal_xs)
+            crop_seg_logit = model(crop_img, crop_modal_xs, text_descriptions=text_descriptions)
             preds += F.pad(
                 crop_seg_logit,
                 (int(x1), int(preds.shape[3] - x2), int(y1), int(preds.shape[2] - y2)),
@@ -275,11 +268,10 @@ def evaluate_msf(
         ):
             print(f"Validation Iter: {idx + 1} / {len(dataloader)}")
 
-        # Unpack all data from the minibatch, including the new 'text' key
         images = minibatch["data"]
         labels = minibatch["label"]
         modal_xs = minibatch["modal_x"]
-        text_descs = minibatch.get('text', None) # Use .get() for safety
+        text_descs = minibatch.get("text")  # only present for text-guided configs
 
         # print(images.shape,labels.shape)
         images = [images.to(device), modal_xs.to(device)]
@@ -298,14 +290,10 @@ def evaluate_msf(
             ]
             scaled_images = [scaled_img.to(device) for scaled_img in scaled_images]
 
-            # Conditionally pass text_descriptions for the main model call
             if sliding:
-                logits = slide_inference(model, scaled_images[0], scaled_images[1], config)
+                logits = slide_inference(model, scaled_images[0], scaled_images[1], config, text_descriptions=text_descs)
             else:
-                if "Text" in config.decoder and text_descs is not None:
-                    logits = model(scaled_images[0], scaled_images[1], text_descriptions=text_descs)
-                else:
-                    logits = model(scaled_images[0], scaled_images[1])
+                logits = model(scaled_images[0], scaled_images[1], text_descriptions=text_descs)
 
             logits = F.interpolate(logits, size=(H, W), mode="bilinear", align_corners=True)
             scaled_logits += logits.softmax(dim=1)
@@ -313,14 +301,10 @@ def evaluate_msf(
             if flip:
                 scaled_images = [torch.flip(scaled_img, dims=(3,)) for scaled_img in scaled_images]
 
-                # Conditionally pass text_descriptions for the flipped model call
                 if sliding:
-                    logits = slide_inference(model, scaled_images[0], scaled_images[1], config)
+                    logits = slide_inference(model, scaled_images[0], scaled_images[1], config, text_descriptions=text_descs)
                 else:
-                    if "Text" in config.decoder and text_descs is not None:
-                        logits = model(scaled_images[0], scaled_images[1], text_descriptions=text_descs)
-                    else:
-                        logits = model(scaled_images[0], scaled_images[1])
+                    logits = model(scaled_images[0], scaled_images[1], text_descriptions=text_descs)
                 
                 logits = torch.flip(logits, dims=(3,))
                 logits = F.interpolate(logits, size=(H, W), mode="bilinear", align_corners=True)

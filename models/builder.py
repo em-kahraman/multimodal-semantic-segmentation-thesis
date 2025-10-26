@@ -72,12 +72,17 @@ class EncoderDecoder(nn.Module):
             channels=cfg.decoder_embed_dim,
         )
         if cfg.decoder == "ham":
+            if self.text_encoder is not None:
+                raise ValueError("The ham decoder does not support text guidance.")
             logger.info("Using Ham Decoder")
             from .decoders.ham_head import LightHamHead
 
             self.decode_head = LightHamHead(**head_kwargs)
         elif cfg.decoder == "HierarchicalTextDecoder":
-            logger.info(f"Using Hierarchical Text Decoder with {cfg.attention} attention")
+            logger.info(
+                f"Using Hierarchical Decoder with {cfg.attention} attention, "
+                + ("text guidance" if text_embed_dim else "no text guidance")
+            )
             from .decoders.hierarchical_text_decoder import HierarchicalTextDecoder
 
             self.decode_head = HierarchicalTextDecoder(

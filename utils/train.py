@@ -303,7 +303,6 @@ with Engine(custom_parser=parser) as engine:
         sum_loss = 0
         i = 0
         train_timer.start()
-        # Modify to pass text descriptions
         for idx in range(config.niters_per_epoch):
             engine.update_iteration(epoch, idx)
 
@@ -312,23 +311,16 @@ with Engine(custom_parser=parser) as engine:
             imgs = minibatch["data"]
             gts = minibatch["label"]
             modal_xs = minibatch["modal_x"]
-            # Unpack the text descriptions from the batch
-            text_descs = minibatch.get('text', None) 
+            text_descs = minibatch.get("text")  # only present for text-guided configs
 
             imgs = imgs.cuda(non_blocking=True)
             gts = gts.cuda(non_blocking=True)
             modal_xs = modal_xs.cuda(non_blocking=True)
 
-            # Check that text was actually loaded if we're using a text model
-            if text_descs is None and "Text" in config.decoder:
-                raise ValueError("Text-guided model running, but no text descriptions were loaded from the dataloader.")
-
             if args.amp:
                 with torch.autocast(device_type="cuda", dtype=torch.float16):
-                    # Pass the text descriptions to the model
                     loss = model(imgs, modal_xs, gts, text_descriptions=text_descs)
             else:
-                # Pass the text descriptions to the model
                 loss = model(imgs, modal_xs, gts, text_descriptions=text_descs)
 
             # reduce the whole loss over multi-gpu
@@ -351,8 +343,8 @@ with Engine(custom_parser=parser) as engine:
             if not args.amp:
                 if epoch == 1:
                     for name, param in model.named_parameters():
-                        # If the parameter is part of the frozen clip_model, skip the check
-                        if "text_encoder.clip_model" in name:
+                        # The frozen text encoder has no gradients by design
+                        if "text_encoder." in name:
                             continue
                         if param.grad is None:
                             logger.warning(f"{name} has no grad, please check")
