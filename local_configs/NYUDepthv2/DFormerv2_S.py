@@ -28,7 +28,7 @@ C.aux_rate = 0.0
 """Eval Config"""
 C.eval_iter = 25
 C.eval_stride_rate = 2 / 3
-C.eval_scale_array = [1]  # [0.75, 1, 1.25] #
+C.eval_scale_array = [0.5, 0.75, 1, 1.25, 1.5]
 C.eval_flip = True  # False #
 C.eval_crop_size = [480, 640]  # [height weight]
 

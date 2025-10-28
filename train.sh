@@ -1,45 +1,28 @@
-GPUS=1
-NNODES=1
-NODE_RANK=${NODE_RANK:-0}
+#!/usr/bin/env bash
+# Usage: bash train.sh <config> [num_gpus]
+#   bash train.sh local_configs.NYUDepthv2.DFormerv2_S_text 1   # thesis setup: 1 GPU
+#   bash train.sh local_configs.SUNRGBD.DFormerv2_S_text 4      # thesis setup: 4 GPUs
+# --pad_SUNRGBD pads the SUN RGB-D validation images to a common size; it is ignored for NYUDepthv2.
+CONFIG=${1:-local_configs.NYUDepthv2.DFormerv2_S_text}
+GPUS=${2:-1}
 PORT=${PORT:-29158}
-MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 
-export CUDA_VISIBLE_DEVICES="1"
-export TORCHDYNAMO_VERBOSE=1
+# Avoids the Hugging Face tokenizers warning when dataloader workers fork (only the main process tokenises)
+export TOKENIZERS_PARALLELISM=true
 
-PYTHONPATH="$(dirname $0)/..":"$(dirname $0)":$PYTHONPATH \
+PYTHONPATH="$(dirname $0)":$PYTHONPATH \
     torchrun \
-    --nnodes=$NNODES \
-    --node_rank=$NODE_RANK \
-    --master_addr=$MASTER_ADDR \
+    --nnodes=1 \
     --nproc_per_node=$GPUS \
     --master_port=$PORT \
     utils/train.py \
-    --config=local_configs.NYUDepthv2.DFormerv2_S_text --gpus=$GPUS \
+    --config=$CONFIG \
+    --gpus=$GPUS \
     --no-sliding \
     --no-compile \
     --syncbn \
     --mst \
-    --compile_mode="default" \
     --no-amp \
     --val_amp \
     --pad_SUNRGBD \
-    --no-use_seed  
-
-# config for DFormers on NYUDepthv2
-# local_configs.NYUDepthv2.DFormer_Large
-# local_configs.NYUDepthv2.DFormer_Base
-# local_configs.NYUDepthv2.DFormer_Small
-# local_configs.NYUDepthv2.DFormer_Tiny
-# local_configs.NYUDepthv2.DFormer_v2_S
-# local_configs.NYUDepthv2.DFormer_v2_B
-# local_configs.NYUDepthv2.DFormer_v2_L
-
-# config for DFormers on SUNRGBD
-# local_configs.SUNRGBD.DFormer_Large
-# local_configs.SUNRGBD.DFormer_Base
-# local_configs.SUNRGBD.DFormer_Small
-# local_configs.SUNRGBD.DFormer_Tiny
-# local_configs.SUNRGBD.DFormer_v2_S
-# local_configs.SUNRGBD.DFormer_v2_B
-# local_configs.SUNRGBD.DFormer_v2_L
+    --use_seed

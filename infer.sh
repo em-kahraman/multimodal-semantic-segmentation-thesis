@@ -1,31 +1,21 @@
-# CUDA_VISIBLE_DEVICES=0,1
-# config -> which model config
-# continue_fpath -> the trained pth path
-GPUS=1
-NNODES=1
-NODE_RANK=${NODE_RANK:-0}
+#!/usr/bin/env bash
+# Save colourised predictions of a trained model to output/.
+# Usage: bash infer.sh <config> <checkpoint.pth> [num_gpus]
+CONFIG=${1:?config required}
+CHECKPOINT=${2:?checkpoint required}
+GPUS=${3:-1}
 PORT=${PORT:-29958}
-MASTER_ADDR=${MASTER_ADDR:-"127.0.0.1"}
 
-PYTHONPATH="$(dirname $0)/..":$PYTHONPATH \
+# Avoids the Hugging Face tokenizers warning when dataloader workers fork (only the main process tokenises)
+export TOKENIZERS_PARALLELISM=true
+
+PYTHONPATH="$(dirname $0)":$PYTHONPATH \
     torchrun \
-    --nnodes=$NNODES \
-    --node_rank=$NODE_RANK \
-    --master_addr=$MASTER_ADDR \
+    --nnodes=1 \
     --nproc_per_node=$GPUS \
     --master_port=$PORT \
     utils/infer.py \
-    --config=local_configs.NYUDepthv2.DFormerv2_S_text \
-    --continue_fpath=checkpoints/trained/NYUDepthv2/DFormerv2_Small_NYU.pth \
+    --config=$CONFIG \
+    --continue_fpath=$CHECKPOINT \
     --save_path "output/" \
     --gpus=$GPUS
-
-# choose the dataset and DFormer for evaluating
-
-# NYUv2 DFormers
-# --config=local_configs.NYUDepthv2.DFormer_Large/Base/Small/Tiny
-# --continue_fpath=checkpoints/trained/NYUv2_DFormer_Large/Base/Small/Tiny.pth
-
-# SUNRGBD DFormers
-# --config=local_configs.SUNRGBD.DFormer_Large/Base/Small/Tiny
-# --continue_fpath=checkpoints/trained/SUNRGBD_DFormer_Large/Base/Small/Tiny.pth
