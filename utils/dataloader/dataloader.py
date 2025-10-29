@@ -182,7 +182,7 @@ def get_train_loader(engine, dataset, config):
         shuffle=is_shuffle,
         pin_memory=True,
         sampler=train_sampler,
-        # worker_init_fn=seed_worker,
+        worker_init_fn=seed_worker,
         # generator=g,
     )
 
@@ -228,7 +228,7 @@ def get_val_loader(engine, dataset, config, val_batch_size=1):
         shuffle=is_shuffle,
         pin_memory=True,
         sampler=val_sampler,
-        # worker_init_fn=seed_worker,
+        worker_init_fn=seed_worker,
         # generator=g,
     )
 
