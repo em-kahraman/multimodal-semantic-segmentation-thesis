@@ -175,6 +175,10 @@ with Engine(custom_parser=parser) as engine:
                         f1, mf1 = metric.compute_f1()
                         logger.info(f"miou:{miou}, macc:{macc}, mf1:{mf1}")
                         logger.info(f"ious:{ious}")
+
+                        tb.add_scalar("Metrics/mIoU", miou, 0)
+                        tb.add_scalar("Metrics/mAcc", macc, 0)
+                        tb.add_scalar("Metrics/mF1", mf1, 0)
             elif not engine.distributed:
                 with torch.no_grad():
                     model.eval()
@@ -204,6 +208,10 @@ with Engine(custom_parser=parser) as engine:
                     f1, mf1 = metric.compute_f1()
                     logger.info(f"miou:{miou}, macc:{macc}, mf1:{mf1}")
                     logger.info(f"ious:{ious}")
+
+                    tb.add_scalar("Metrics/mIoU", miou, 0)
+                    tb.add_scalar("Metrics/mAcc", macc, 0)
+                    tb.add_scalar("Metrics/mF1", mf1, 0)
     else:
         if engine.distributed:
             with torch.no_grad():
@@ -238,6 +246,10 @@ with Engine(custom_parser=parser) as engine:
                     f1, mf1 = metric.compute_f1()
                     logger.info(f"miou:{miou}, macc:{macc}, mf1:{mf1}")
                     logger.info(f"ious:{ious}")
+
+                    tb.add_scalar("Metrics/mIoU", miou, 0)
+                    tb.add_scalar("Metrics/mAcc", macc, 0)
+                    tb.add_scalar("Metrics/mF1", mf1, 0)
         elif not engine.distributed:
             with torch.no_grad():
                 model.eval()
@@ -267,4 +279,12 @@ with Engine(custom_parser=parser) as engine:
                 f1, mf1 = metric.compute_f1()
                 logger.info(f"miou:{miou}, macc:{macc}, mf1:{mf1}")
                 logger.info(f"ious:{ious}")
+
+                tb.add_scalar("Metrics/mIoU", miou, 0)
+                tb.add_scalar("Metrics/mAcc", macc, 0)
+                tb.add_scalar("Metrics/mF1", mf1, 0)
+
+    if (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed):
+        tb.close()
+
     logger.info("end testing")

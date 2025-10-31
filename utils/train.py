@@ -382,10 +382,10 @@ with Engine(custom_parser=parser) as engine:
         logger.info(print_str)
         train_timer.stop()
 
-        # if (engine.distributed and (engine.local_rank == 0)) or (
-        #     not engine.distributed
-        # ):
-        #     tb.add_scalar("train_loss", sum_loss / len(pbar), epoch)
+        if (engine.distributed and (engine.local_rank == 0)) or (
+            not engine.distributed
+        ):
+            tb.add_scalar("Loss/train", sum_loss / len(train_loader), epoch)
 
         if is_eval(epoch, config):
             eval_timer.start()
@@ -520,7 +520,11 @@ with Engine(custom_parser=parser) as engine:
                         metric=miou,
                     )
                 print("miou", miou, "best", best_miou)
-            logger.info(f"Epoch {epoch} validation result: mIoU {miou}, best mIoU {best_miou}")
+            if (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed):
+                logger.info(f"Epoch {epoch} validation result: mIoU {miou}, best mIoU {best_miou}")
+                tb.add_scalar("Validation/mIoU", miou, epoch)
+                tb.add_scalar("Validation/mAcc", macc, epoch)
+                tb.add_scalar("Validation/mF1", mf1, epoch)
             eval_timer.stop()
 
         eval_count = 0
@@ -532,3 +536,6 @@ with Engine(custom_parser=parser) as engine:
         logger.info(
             f"Avg train time: {train_timer.mean_time:.2f}s, avg eval time: {eval_timer.mean_time:.2f}s, left eval count: {eval_count}, ETA: {eta}"
         )
+
+    if (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed):
+        tb.close()

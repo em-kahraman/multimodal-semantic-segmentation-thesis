@@ -155,6 +155,10 @@ with Engine(custom_parser=parser) as engine:
                 acc, macc = metric.compute_pixel_acc()
                 f1, mf1 = metric.compute_f1()
                 print(miou, "---------")
+
+                tb.add_scalar("Inference/mIoU", miou, 0)
+                tb.add_scalar("Inference/mAcc", macc, 0)
+                tb.add_scalar("Inference/mF1", mf1, 0)
     else:
         with torch.no_grad():
             model.eval()
@@ -175,3 +179,10 @@ with Engine(custom_parser=parser) as engine:
             acc, macc = metric.compute_pixel_acc()
             f1, mf1 = metric.compute_f1()
             print("miou", miou)
+
+            tb.add_scalar("Inference/mIoU", miou, 0)
+            tb.add_scalar("Inference/mAcc", macc, 0)
+            tb.add_scalar("Inference/mF1", mf1, 0)
+
+    if (engine.distributed and (engine.local_rank == 0)) or (not engine.distributed):
+        tb.close()
