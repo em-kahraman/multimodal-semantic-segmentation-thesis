@@ -15,6 +15,7 @@ from utils.dataloader.dataloader import get_val_loader
 from utils.dataloader.RGBXDataset import RGBXDataset
 from utils.engine.engine import Engine
 from utils.engine.logger import get_logger
+from utils.load_utils import load_model_weights
 
 # from eval import evaluate_mid
 
@@ -120,7 +121,7 @@ with Engine(custom_parser=parser) as engine:
         weight = weight["state_dict"]
 
     logger.info(f"load model from {args.continue_fpath}")
-    print(model.load_state_dict(weight, strict=False))
+    load_model_weights(model, weight, logger)
 
     if engine.distributed:
         logger.info(".............distributed training.............")

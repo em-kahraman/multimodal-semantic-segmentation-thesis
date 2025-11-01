@@ -11,6 +11,8 @@ import torch
 import torch.utils.model_zoo as model_zoo
 import torch.distributed as dist
 
+from utils.load_utils import convert_checkpoint, load_model_weights
+
 
 class LogFormatter(logging.Formatter):
     log_fout = None
@@ -177,6 +179,7 @@ def load_model(model, model_file, is_restore=False):
         state_dict = model_file
     t_ioend = time.time()
 
+    state_dict = convert_checkpoint(state_dict)
     if is_restore:
         new_state_dict = OrderedDict()
         for k, v in state_dict.items():
@@ -184,12 +187,7 @@ def load_model(model, model_file, is_restore=False):
             new_state_dict[name] = v
         state_dict = new_state_dict
 
-    model.load_state_dict(state_dict, strict=True)
-    ckpt_keys = set(state_dict.keys())
-    own_keys = set(model.state_dict().keys())
-    missing_keys = own_keys - ckpt_keys
-    unexpected_keys = ckpt_keys - own_keys
-
+    load_model_weights(model, state_dict, logger)
     del state_dict
     t_end = time.time()
     logger.info(

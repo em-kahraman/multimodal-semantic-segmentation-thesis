@@ -111,6 +111,9 @@ class Engine(object):
             key = k
             if k.split(".")[0] == "module":
                 key = k[7:]
+            # The frozen text encoder is loaded from the Hugging Face Hub, no need to store it
+            if key.startswith("text_encoder."):
+                continue
             new_state_dict[key] = v
         state_dict["model"] = new_state_dict
         state_dict["optimizer"] = self.state.optimizer.state_dict()

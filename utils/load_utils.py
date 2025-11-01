@@ -78,3 +78,36 @@ def load_pretrain(model, filename, strict=False, revise_keys=[(r"^module\.", "")
     # load state_dict
     load_state_dict(model, state_dict, strict)
     return checkpoint
+
+
+# Decoder keys renamed during the code clean-up: (old, new)
+LEGACY_KEY_RENAMES = [("decode_head.up4_3_new.", "decode_head.up4_3."), ("decode_head.up3_2_new.", "decode_head.up3_2.")]
+# Frozen modules that are loaded from the Hugging Face Hub instead of checkpoints
+FROZEN_PREFIXES = ("text_encoder.",)
+
+
+def convert_checkpoint(state_dict):
+    """Adapt a saved state dict to the current model.
+
+    Drops the frozen text encoder weights and renames decoder keys of checkpoints
+    trained before the code clean-up.
+    """
+    converted = {}
+    for key, value in state_dict.items():
+        if key.startswith(FROZEN_PREFIXES):
+            continue
+        for old, new in LEGACY_KEY_RENAMES:
+            if key.startswith(old):
+                key = new + key[len(old) :]
+        converted[key] = value
+    return converted
+
+
+def load_model_weights(model, state_dict, logger=None):
+    """Load a (possibly legacy) checkpoint into `model`, failing if any trainable weight is missing."""
+    missing, unexpected = model.load_state_dict(convert_checkpoint(state_dict), strict=False)
+    missing = [k for k in missing if not k.split("module.", 1)[-1].startswith(FROZEN_PREFIXES)]
+    if missing:
+        raise RuntimeError(f"Checkpoint is missing {len(missing)} weights, e.g. {missing[:5]}")
+    if unexpected and logger is not None:
+        logger.warning(f"Ignoring {len(unexpected)} unexpected checkpoint weights, e.g. {unexpected[:5]}")

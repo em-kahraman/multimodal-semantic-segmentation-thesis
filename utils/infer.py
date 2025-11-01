@@ -24,6 +24,7 @@ from utils.engine.logger import get_logger
 from utils.init_func import group_weight, init_weight
 from utils.lr_policy import WarmUpPolyLR
 from utils.metric import compute_score, hist_info
+from utils.load_utils import load_model_weights
 from utils.pyt_utils import all_reduce_tensor, ensure_dir, link_file, load_model, parse_devices
 from utils.val_mm import evaluate, evaluate_msf
 from utils.visualize import print_iou, show_img
@@ -76,10 +77,9 @@ with Engine(custom_parser=parser) as engine:
         BatchNorm2d = nn.BatchNorm2d
 
     model = segmodel(cfg=config, norm_layer=BatchNorm2d)
-    weight = torch.load(args.continue_fpath)["state_dict"]
-
-    print("load model")
-    model.load_state_dict(weight, strict=False)
+    weight = torch.load(args.continue_fpath, map_location=torch.device("cpu"))["model"]
+    logger.info(f"load model from {args.continue_fpath}")
+    load_model_weights(model, weight, logger)
 
     if engine.distributed:
         logger.info(".............distributed training.............")
