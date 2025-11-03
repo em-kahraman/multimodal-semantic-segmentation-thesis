@@ -1,0 +1,14 @@
+# Tested with Python 3.10. Install PyTorch first (CUDA 11.8 build):
+#   pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu118
+transformers==4.49.0
+numpy==1.26.4
+timm==1.0.30
+einops==0.8.2
+opencv-python==4.11.0.86
+matplotlib==3.10.9
+PyYAML==6.0.3
+scipy==1.15.3
+tqdm==4.70.1
+easydict==1.13
+tensorboardX==2.6.5
+tabulate==0.10.0
